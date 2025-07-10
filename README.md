@@ -28,8 +28,6 @@ A simple, lightweight WhatsApp bot base built with Go and WhatsMeow library. Per
 
 - **🔐 Pairing Code Authentication**: Easy login using pairing code
 - **💾 Session Management**: Automatic session storage in `lib/sessions/`
-- **🔇 Clean Logging**: Minimal terminal output without debug spam
-- **📁 Auto Directory Creation**: Session folders created automatically
 - **🎯 Simple Message Handler**: Clean base for feature development
 - **⚡ Lightweight**: Minimal dependencies and fast startup
 
@@ -44,8 +42,8 @@ A simple, lightweight WhatsApp bot base built with Go and WhatsMeow library. Per
 
 1. Clone the repository:
 ```bash
-git clone <your-repository-url>
-cd furina-bot
+git clone https://github.com/FahriAdison/Furina-Go.git
+cd Furina-Go
 ```
 
 2. Install dependencies:
@@ -60,7 +58,7 @@ go build
 
 4. Run the bot:
 ```bash
-./furina-bot
+./Furina-Go
 ```
 
 ### First Run
@@ -87,7 +85,7 @@ furina-bot/
 
 ### Pairing Code (Default)
 ```bash
-./furina-bot
+./Furina-Go
 ```
 1. Enter your phone number when prompted
 2. Enter the displayed pairing code in WhatsApp Web/Desktop
