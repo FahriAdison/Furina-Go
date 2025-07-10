@@ -159,16 +159,16 @@ go mod tidy
 go run main.go
 
 # Build for production
-go build -o furina-bot
+go build -o Furina-Go
 ```
 
 ### For Production
 ```bash
 # Build optimized binary
-go build -ldflags="-s -w" -o furina-bot
+go build -ldflags="-s -w" -o Furina-Go
 
 # Run as service
-./furina-bot
+./Furina-Go
 ```
 
 ## Troubleshooting
@@ -211,7 +211,7 @@ clientLog := waLog.Stdout("Client", "DEBUG", true)
 - [ ] Enhanced command system with prefix support
 - [ ] Plugin architecture for modular features
 - [ ] Improved error handling and recovery
-- [ ] Better session management
+- [✓] Better session management
 
 ### Planned Features
 - [ ] Database integration for user data and settings
@@ -231,7 +231,7 @@ clientLog := waLog.Stdout("Client", "DEBUG", true)
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the GPL-2.0 license - see the LICENSE file for details.
 
 ## Contributing
 
