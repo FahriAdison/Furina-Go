@@ -211,7 +211,7 @@ clientLog := waLog.Stdout("Client", "DEBUG", true)
 - [ ] Enhanced command system with prefix support
 - [ ] Plugin architecture for modular features
 - [ ] Improved error handling and recovery
-- [✓] Better session management
+- [ ] Better session management
 
 ### Planned Features
 - [ ] Database integration for user data and settings
