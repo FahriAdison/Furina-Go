@@ -1,4 +1,0 @@
-[2025-07-11 15:47:26] INFO in SessionManager: Database container initialized
-[2025-07-11 15:47:30] INFO in eventHandler: Bot connected successfully
-[2025-07-11 15:48:07] INFO in eventHandler: Message from 6285179855248@s.whatsapp.net: !ping
-[2025-07-11 15:48:15] INFO in eventHandler: Message from 6285179855248@s.whatsapp.net: !menu
