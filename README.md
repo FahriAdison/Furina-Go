@@ -24,13 +24,6 @@ A simple, lightweight WhatsApp bot base built with Go and WhatsMeow library. Per
 
 > **Note**: This is a base template designed to be extended with your own features. The core functionality is stable, but additional features are continuously being developed.
 
-## Features
-
-- **🔐 Pairing Code Authentication**: Easy login using pairing code
-- **💾 Session Management**: Automatic session storage in `lib/sessions/`
-- **🎯 Simple Message Handler**: Clean base for feature development
-- **⚡ Lightweight**: Minimal dependencies and fast startup
-
 ## Quick Start
 
 ### Prerequisites
@@ -58,7 +51,7 @@ go build
 
 4. Run the bot:
 ```bash
-./Furina-Go
+./furina-bot
 ```
 
 ### First Run
@@ -67,25 +60,11 @@ go build
 2. Enter the pairing code shown into WhatsApp Web/Desktop
 3. Bot will connect and ready to receive messages
 
-## Project Structure
-
-```
-furina-bot/
-├── main.go              # Main source code
-├── go.mod               # Module definition
-├── go.sum               # Dependencies checksum
-├── lib/
-│   └── sessions/        # Session storage (auto-created)
-│       ├── furina-bot.db
-│       └── furina-bot.db-journal
-└── README.md           # Documentation
-```
-
 ## Authentication
 
 ### Pairing Code (Default)
 ```bash
-./Furina-Go
+./furina-bot
 ```
 1. Enter your phone number when prompted
 2. Enter the displayed pairing code in WhatsApp Web/Desktop
@@ -93,38 +72,77 @@ furina-bot/
 
 ## Development
 
-### Adding New Features
+### Plugin System
 
-This bot serves as a simple base ready for development. You can add new features in the `eventHandler()` function in `main.go`.
+The bot now uses a modular plugin architecture. All features are organized as plugins in the `plugins/` directory.
 
-### Basic Message Handling
+#### Available Plugins
 
-The current implementation includes:
-- Simple ping response (logs only)
-- Message logging with sender information
-- Connection status monitoring
-- Clean session management
+- **Ping Plugin** (`plugins/general/ping.go`): Simple test plugin
+  - Commands: `!ping`, `!pong`
+  - Purpose: Test bot connectivity and response
 
-### Extending the Bot
+#### Creating New Plugins
+
+1. Create a new file in the appropriate subfolder (`plugins/general/`, `plugins/admin/`, etc.)
+2. Implement the `Plugin` interface:
 
 ```go
-// Example: Add command handling in eventHandler
-case *events.Message:
-    if !v.Info.IsFromMe && v.Message.GetConversation() != "" {
-        messageText := v.Message.GetConversation()
-        senderJID := v.Info.Sender
-        
-        // Add your custom commands here
-        switch strings.ToLower(messageText) {
-        case "ping":
-            // Reply with pong
-        case "help":
-            // Show help message
-        default:
-            // Handle other messages
-        }
-    }
+package general
+
+import (
+    "furina-bot/lib"
+    "go.mau.fi/whatsmeow"
+    "go.mau.fi/whatsmeow/types/events"
+)
+
+type MyPlugin struct{}
+
+// Ensure plugin implements the interface
+var _ lib.Plugin = (*MyPlugin)(nil)
+
+func NewMyPlugin() *MyPlugin {
+    return &MyPlugin{}
+}
+
+func (p *MyPlugin) GetName() string {
+    return "myplugin"
+}
+
+func (p *MyPlugin) GetCommands() []string {
+    return []string{"mycommand", "test"}
+}
+
+func (p *MyPlugin) GetDescription() string {
+    return "Description of my plugin"
+}
+
+func (p *MyPlugin) HandleMessage(client *whatsmeow.Client, message *events.Message) error {
+    // Handle the command here
+    return nil
+}
 ```
+
+3. Register the plugin in `main.go` in the `registerPlugins()` function:
+
+```go
+func registerPlugins() {
+    // Existing plugins...
+    
+    // Add your new plugin
+    myPlugin := general.NewMyPlugin()
+    pluginManager.RegisterPlugin(myPlugin)
+}
+```
+
+### Command System
+
+The bot uses a prefix-based command system:
+- Default prefix: `!`
+- Commands are case-insensitive
+- Format: `!command [arguments]`
+- Examples: `!ping`, `!help`, `!status`
+
 
 ## Configuration
 
@@ -159,16 +177,16 @@ go mod tidy
 go run main.go
 
 # Build for production
-go build -o Furina-Go
+go build -o furina-bot
 ```
 
 ### For Production
 ```bash
 # Build optimized binary
-go build -ldflags="-s -w" -o Furina-Go
+go build -ldflags="-s -w" -o furina-bot
 
 # Run as service
-./Furina-Go
+./furina-bot
 ```
 
 ## Troubleshooting
@@ -208,10 +226,10 @@ clientLog := waLog.Stdout("Client", "DEBUG", true)
 ## 🗺️ Development Roadmap
 
 ### Currently in Development
-- [ ] Enhanced command system with prefix support
-- [ ] Plugin architecture for modular features
-- [ ] Improved error handling and recovery
-- [ ] Better session management
+- [x] Enhanced command system with prefix support
+- [x] Plugin architecture for modular features
+- [x] Improved error handling and recovery
+- [x] Better session management
 
 ### Planned Features
 - [ ] Database integration for user data and settings

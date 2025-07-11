@@ -6,49 +6,83 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 
+	"furina-bot/lib"
+	"furina-bot/plugins/general"
+
 	"go.mau.fi/whatsmeow"
-	"go.mau.fi/whatsmeow/store/sqlstore"
 	"go.mau.fi/whatsmeow/types/events"
 	waLog "go.mau.fi/whatsmeow/util/log"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
+var (
+	pluginManager *lib.PluginManager
+	errorHandler  *lib.ErrorHandler
+	sessionManager *lib.SessionManager
+	commandParser *lib.CommandParser
+)
+
 func main() {
-	// Create context
-	ctx := context.Background()
-	
-	// Setup sessions directory
-	sessionsDir := "lib/sessions"
-	dbPath := filepath.Join(sessionsDir, "furina-bot.db")
-	
-	// Create sessions directory if it doesn't exist
-	if err := createSessionsDir(sessionsDir); err != nil {
-		panic(fmt.Errorf("failed to create sessions directory: %v", err))
-	}
-	
-	// Setup logging (reduced verbosity)
-	dbLog := waLog.Stdout("Database", "ERROR", false)
-	
-	// Create database container with new path
-	container, err := sqlstore.New(ctx, "sqlite3", fmt.Sprintf("file:%s?_foreign_keys=on", dbPath), dbLog)
+	// Setup error handler dengan recovery
+	defer func() {
+		if errorHandler != nil {
+			errorHandler.RecoverFromPanic("main")
+			errorHandler.Close()
+		}
+	}()
+
+	// Inisialisasi error handler
+	var err error
+	errorHandler, err = lib.NewErrorHandler("lib/logs")
 	if err != nil {
-		panic(err)
+		fmt.Printf("⚠️ Gagal menginisialisasi error handler: %v\n", err)
+		// Lanjutkan tanpa error handler
+	} else {
+		fmt.Println("✅ Error handler berhasil diinisialisasi")
 	}
 
-	// Get device store
-	deviceStore, err := container.GetFirstDevice(ctx)
+	// Inisialisasi session manager
+	sessionManager, err = lib.NewSessionManager("lib/sessions", errorHandler)
 	if err != nil {
+		if errorHandler != nil {
+			errorHandler.LogError(err, "main.sessionManager")
+		}
+		panic(fmt.Errorf("failed to initialize session manager: %v", err))
+	}
+	fmt.Println("✅ Session manager berhasil diinisialisasi")
+
+
+
+	// Create context
+	ctx := context.Background()
+
+	// Get device store dari session manager
+	deviceStore, err := sessionManager.GetFirstDevice(ctx)
+	if err != nil {
+		if errorHandler != nil {
+			errorHandler.LogError(err, "main.getFirstDevice")
+		}
 		panic(err)
 	}
 
 	// Setup client logging (reduced verbosity)
 	clientLog := waLog.Stdout("Client", "ERROR", false)
 	client := whatsmeow.NewClient(deviceStore, clientLog)
+
+	// Inisialisasi command parser
+	commandParser = lib.NewCommandParser(lib.DefaultCommandConfig())
+	fmt.Println("✅ Command parser berhasil diinisialisasi")
+
+	// Inisialisasi plugin manager
+	pluginManager = lib.NewPluginManager(client)
+	
+	// Daftarkan plugin
+	registerPlugins()
+	fmt.Println("✅ Plugin manager berhasil diinisialisasi")
 
 	// Add event handler
 	client.AddEventHandler(eventHandler)
@@ -69,6 +103,9 @@ func main() {
 		// Connect to WhatsApp first
 		err = client.Connect()
 		if err != nil {
+			if errorHandler != nil {
+				errorHandler.LogError(err, "main.connect")
+			}
 			panic(fmt.Errorf("failed to connect: %v", err))
 		}
 
@@ -77,6 +114,9 @@ func main() {
 		// Request pairing code
 		code, err := client.PairPhone(ctx, phoneNumber, true, whatsmeow.PairClientChrome, "Chrome (Linux)")
 		if err != nil {
+			if errorHandler != nil {
+				errorHandler.LogError(err, "main.pairPhone")
+			}
 			panic(fmt.Errorf("failed to request pairing code: %v", err))
 		}
 
@@ -88,11 +128,12 @@ func main() {
 		// Already logged in, just connect
 		err = client.Connect()
 		if err != nil {
+			if errorHandler != nil {
+				errorHandler.LogError(err, "main.reconnect")
+			}
 			panic(fmt.Errorf("failed to connect: %v", err))
 		}
 	}
-
-	// Status akan ditampilkan oleh event handler Connected
 
 	// Wait for interrupt signal
 	c := make(chan os.Signal, 1)
@@ -100,28 +141,37 @@ func main() {
 	<-c
 
 	fmt.Println("\nMenghentikan bot...")
+	
 	client.Disconnect()
+	fmt.Println("👋 Bot berhasil dihentikan")
 }
 
-// createSessionsDir creates the sessions directory if it doesn't exist
-func createSessionsDir(sessionsDir string) error {
-	// Check if directory exists
-	if _, err := os.Stat(sessionsDir); os.IsNotExist(err) {
-		fmt.Printf("📁 Membuat folder sesi: %s\n", sessionsDir)
-		// Create directory with proper permissions
-		if err := os.MkdirAll(sessionsDir, 0755); err != nil {
-			return fmt.Errorf("failed to create directory %s: %v", sessionsDir, err)
-		}
-		fmt.Println("✅ Folder sesi berhasil dibuat")
-	} else if err != nil {
-		return fmt.Errorf("failed to check directory %s: %v", sessionsDir, err)
-	} else {
-		fmt.Printf("📂 Menggunakan folder sesi yang sudah ada: %s\n", sessionsDir)
-	}
-	return nil
+// registerPlugins mendaftarkan semua plugin yang tersedia
+func registerPlugins() {
+	var registeredPlugins []string
+	
+	// Daftarkan plugin ping dari folder general
+	pingPlugin := general.NewPingPlugin()
+	pluginManager.RegisterPlugin(pingPlugin)
+	registeredPlugins = append(registeredPlugins, pingPlugin.GetName())
+	
+	// Daftarkan plugin help
+	helpPlugin := general.NewHelpPlugin()
+	pluginManager.RegisterPlugin(helpPlugin)
+	registeredPlugins = append(registeredPlugins, helpPlugin.GetName())
+	
+	// Tampilkan plugins terdaftar dalam satu baris
+	fmt.Printf("📦 Plugin terdaftar: %s\n", strings.Join(registeredPlugins, ", "))
 }
 
 func eventHandler(evt interface{}) {
+	// Tambahkan recovery untuk event handler
+	defer func() {
+		if errorHandler != nil {
+			errorHandler.RecoverFromPanic("eventHandler")
+		}
+	}()
+
 	switch v := evt.(type) {
 	case *events.Message:
 		// Handle incoming messages
@@ -131,11 +181,20 @@ func eventHandler(evt interface{}) {
 			
 			fmt.Printf("📨 Pesan dari %s: %s\n", senderJID, messageText)
 			
-			// Simple echo bot - reply with the same message
-			if strings.ToLower(messageText) == "ping" {
-				fmt.Printf("💬 Mengirim balasan 'pong' ke %s\n", senderJID)
-				// Note: In a real implementation, you'd need access to the client here
-				// This is a simplified example
+			// Log pesan ke error handler
+			if errorHandler != nil {
+				errorHandler.LogInfo(fmt.Sprintf("Message from %s: %s", senderJID, messageText), "eventHandler")
+			}
+			
+			// Cek apakah pesan adalah command
+			if commandParser.IsCommand(messageText) {
+				// Teruskan ke plugin manager
+				if err := pluginManager.HandleMessage(v); err != nil {
+					fmt.Printf("❌ Error handling command: %v\n", err)
+					if errorHandler != nil {
+						errorHandler.LogError(err, "eventHandler.pluginManager")
+					}
+				}
 			}
 		}
 	case *events.Receipt:
@@ -147,10 +206,26 @@ func eventHandler(evt interface{}) {
 		fmt.Println("\n✅ Bot WhatsApp Furina berhasil terhubung!")
 		fmt.Println("💾 Sesi tersimpan di: lib/sessions/")
 		fmt.Println("🤖 Bot siap menerima pesan")
+		fmt.Println("🎯 Prefix command: ! (contoh: !ping)")
 		fmt.Println("⚡ Tekan Ctrl+C untuk menghentikan bot")
+		
+		if errorHandler != nil {
+			errorHandler.LogInfo("Bot connected successfully", "eventHandler")
+		}
+		
+		// Tampilkan info plugin yang tersedia
+		plugins := pluginManager.GetAllPlugins()
+		fmt.Printf("📦 %d plugin aktif\n", len(plugins))
+		
 	case *events.Disconnected:
 		fmt.Println("❌ Terputus dari WhatsApp")
+		if errorHandler != nil {
+			errorHandler.LogInfo("Bot disconnected", "eventHandler")
+		}
 	case *events.LoggedOut:
 		fmt.Println("🚪 Logged out dari WhatsApp")
+		if errorHandler != nil {
+			errorHandler.LogInfo("Bot logged out", "eventHandler")
+		}
 	}
 }
